@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import lazyload
@@ -45,14 +45,14 @@ async def get_packets(node_id=None, portnum=None, after=None, before=None, limit
         if after:
             # Support both timedelta and datetime for backwards compatibility
             if isinstance(after, timedelta):
-                after_time = datetime.now() - after
+                after_time = datetime.now(UTC) - after
             else:
                 after_time = after
             q = q.where(Packet.import_time > after_time)
         if before:
             # Support both timedelta and datetime for backwards compatibility
             if isinstance(before, timedelta):
-                before_time = datetime.now() - before
+                before_time = datetime.now(UTC) - before
             else:
                 before_time = before
             q = q.where(Packet.import_time < before_time)
@@ -76,7 +76,7 @@ async def get_packets_from(node_id=None, portnum=None, since=None, limit=500):
         if portnum:
             q = q.where(Packet.portnum == portnum)
         if since:
-            q = q.where(Packet.import_time > (datetime.now() - since))
+            q = q.where(Packet.import_time > (datetime.now(UTC) - since))
         result = await session.execute(q.limit(limit).order_by(Packet.import_time.desc()))
         return result.scalars()
 
@@ -144,7 +144,7 @@ async def get_traceroutes(since):
     async with database.async_session() as session:
         # Support both timedelta and datetime for backwards compatibility
         if isinstance(since, timedelta):
-            cutoff_time = datetime.now() - since
+            cutoff_time = datetime.now(UTC) - since
         else:
             cutoff_time = since
 
@@ -167,7 +167,7 @@ async def get_mqtt_neighbors(since):
             .where(
                 (PacketSeen.hop_limit == PacketSeen.hop_start)
                 & (PacketSeen.hop_start != 0)
-                & (PacketSeen.import_time > (datetime.now() - since))
+                & (PacketSeen.import_time > (datetime.now(UTC) - since))
             )
             .options(
                 lazyload(Packet.from_node),
@@ -198,7 +198,7 @@ async def get_total_node_count(channel: str = None) -> int:
     try:
         async with database.async_session() as session:
             q = select(func.count(Node.id)).where(
-                Node.last_update > datetime.now() - timedelta(days=1)
+                Node.last_update > datetime.now(UTC) - timedelta(days=1)
             )
 
             if channel:
@@ -214,7 +214,7 @@ async def get_total_node_count(channel: str = None) -> int:
 async def get_top_traffic_nodes():
     try:
         # Calculate 24 hours ago in Python for database-agnostic query
-        cutoff_time = datetime.now() - timedelta(hours=24)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
 
         async with database.async_session() as session:
             result = await session.execute(
@@ -260,7 +260,7 @@ async def get_top_traffic_nodes():
 async def get_node_traffic(node_id: int):
     try:
         # Calculate 24 hours ago in Python for database-agnostic query
-        cutoff_time = datetime.now() - timedelta(hours=24)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
 
         async with database.async_session() as session:
             result = await session.execute(
@@ -324,7 +324,7 @@ async def get_nodes(role=None, channel=None, hw_model=None, days_active=None):
                 query = query.where(Node.hw_model == hw_model)
 
             if days_active is not None:
-                query = query.where(Node.last_update > datetime.now() - timedelta(days_active))
+                query = query.where(Node.last_update > datetime.now(UTC) - timedelta(days_active))
 
             # Exclude nodes where last_update is NULL
             query = query.where(Node.last_update.is_not(None))
@@ -350,7 +350,7 @@ async def get_packet_stats(
     to_node: int | None = None,
     from_node: int | None = None,
 ):
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     if period_type == "hour":
         start_time = now - timedelta(hours=length)
@@ -411,7 +411,7 @@ async def get_channels_in_period(period_type: str = "hour", length: int = 24):
     period_type: "hour" or "day"
     length: number of hours or days to look back
     """
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     if period_type == "hour":
         start_time = now - timedelta(hours=length)

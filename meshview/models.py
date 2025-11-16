@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, Index, desc
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, desc
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -22,7 +22,7 @@ class Node(Base):
     last_lat: Mapped[int] = mapped_column(BigInteger, nullable=True)
     last_long: Mapped[int] = mapped_column(BigInteger, nullable=True)
     channel: Mapped[str] = mapped_column(nullable=True)
-    last_update: Mapped[datetime] = mapped_column(nullable=True)
+    last_update: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("idx_node_node_id", "node_id"),)
 
@@ -49,7 +49,7 @@ class Packet(Base):
         overlaps="from_node",
     )
     payload: Mapped[bytes] = mapped_column(nullable=True)
-    import_time: Mapped[datetime] = mapped_column(nullable=True)
+    import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     channel: Mapped[str] = mapped_column(nullable=True)
 
     __table_args__ = (
@@ -77,7 +77,7 @@ class PacketSeen(Base):
     rx_snr: Mapped[float] = mapped_column(nullable=True)
     rx_rssi: Mapped[int] = mapped_column(nullable=True)
     topic: Mapped[str] = mapped_column(nullable=True)
-    import_time: Mapped[datetime] = mapped_column(nullable=True)
+    import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("idx_packet_seen_node_id", "node_id"),
@@ -97,7 +97,7 @@ class Traceroute(Base):
     gateway_node_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     done: Mapped[bool] = mapped_column(nullable=True)
     route: Mapped[bytes] = mapped_column(nullable=True)
-    import_time: Mapped[datetime] = mapped_column(nullable=True)
+    import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("idx_traceroute_import_time", "import_time"),)
 
@@ -109,7 +109,7 @@ class DeviceMetrics(Base):
     packet_id: Mapped[int] = mapped_column(ForeignKey("packet.id"), nullable=False)
     node_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     time: Mapped[int] = mapped_column(BigInteger, nullable=True)
-    import_time: Mapped[datetime] = mapped_column(nullable=False)
+    import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     battery_level: Mapped[int] = mapped_column(nullable=True)
     voltage: Mapped[float] = mapped_column(nullable=True)
     channel_utilization: Mapped[float] = mapped_column(nullable=True)
@@ -130,7 +130,7 @@ class EnvironmentMetrics(Base):
     packet_id: Mapped[int] = mapped_column(ForeignKey("packet.id"), nullable=False)
     node_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     time: Mapped[int] = mapped_column(BigInteger, nullable=True)
-    import_time: Mapped[datetime] = mapped_column(nullable=False)
+    import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     temperature: Mapped[float] = mapped_column(nullable=True)
     relative_humidity: Mapped[float] = mapped_column(nullable=True)
     barometric_pressure: Mapped[float] = mapped_column(nullable=True)
@@ -175,7 +175,7 @@ class Position(Base):
     # Timing
     timestamp: Mapped[int] = mapped_column(BigInteger, nullable=True)
     timestamp_millis_adjust: Mapped[int] = mapped_column(nullable=True)
-    import_time: Mapped[datetime] = mapped_column(nullable=False)
+    import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # GPS Quality/Accuracy metrics
     PDOP: Mapped[int] = mapped_column(nullable=True)

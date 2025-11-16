@@ -33,7 +33,7 @@
         <div class="card-text text-start">
             <dl>
                 <dt>Import Time</dt>
-                <dd>{{packet.import_time.strftime('%-I:%M:%S %p - %m-%d-%Y')}}</dd>
+                <dd class="timestamp-display" data-timestamp="{{packet.import_time.isoformat()}}">{{packet.import_time.isoformat()}}</dd>
                 <dt>packet</dt>
                 <dd><pre>{{packet.data}}</pre></dd>
                 <dt>payload</dt>
@@ -67,3 +67,15 @@
         </div>
     </div>
 </div>
+
+<script>
+// Convert UTC timestamps to local timezone
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.timestamp-display[data-timestamp]').forEach(el => {
+        const date = new Date(el.dataset.timestamp);
+        const formattedTime = date.toLocaleTimeString([], { hour:"numeric", minute:"2-digit", second:"2-digit", hour12:true });
+        const formattedDate = `${(date.getMonth()+1).toString().padStart(2,"0")}/${date.getDate().toString().padStart(2,"0")}/${date.getFullYear()}`;
+        el.textContent = `${formattedTime} - ${formattedDate}`;
+    });
+});
+</script>

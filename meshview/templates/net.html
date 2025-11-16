@@ -34,8 +34,8 @@
       role="article"
       aria-label="Chat message from {{ packet.from_node.long_name or (packet.from_node_id | node_id_to_hex) }}"
   >
-      <span class="col-2 timestamp">
-          {{ packet.import_time.strftime('%-I:%M:%S %p - %m-%d-%Y') }}
+      <span class="col-2 timestamp timestamp-display" data-timestamp="{{packet.import_time.isoformat()}}">
+          {{packet.import_time.isoformat()}}
       </span>
       <span class="col-1 timestamp">
           <a href="/packet/{{ packet.id }}" title="View packet details">✉️</a> {{ packet.from_node.channel }}
@@ -55,6 +55,16 @@
 </div>
 
 <script>
+// Convert UTC timestamps to local timezone
+function convertTimestamps() {
+    document.querySelectorAll('.timestamp-display[data-timestamp]').forEach(el => {
+        const date = new Date(el.dataset.timestamp);
+        const formattedTime = date.toLocaleTimeString([], { hour:"numeric", minute:"2-digit", second:"2-digit", hour12:true });
+        const formattedDate = `${(date.getMonth()+1).toString().padStart(2,"0")}/${date.getDate().toString().padStart(2,"0")}/${date.getFullYear()}`;
+        el.textContent = `${formattedTime} - ${formattedDate}`;
+    });
+}
+
 async function loadTranslations() {
     try {
         const langCode = "{{ site_config.get('site', {}).get('language','en') }}";
@@ -70,6 +80,9 @@ async function loadTranslations() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", loadTranslations());
+document.addEventListener("DOMContentLoaded", () => {
+    convertTimestamps();
+    loadTranslations();
+});
 </script>
 {% endblock %}

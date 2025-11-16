@@ -47,7 +47,7 @@ async def process_envelope(topic, env):
                     node.last_lat = map_report.latitude_i
                     node.last_long = map_report.longitude_i
                     node.firmware = map_report.firmware_version
-                    node.last_update = datetime.datetime.now()
+                    node.last_update = datetime.datetime.now(datetime.UTC)
                 else:
                     node = Node(
                         id=user_id,
@@ -60,7 +60,7 @@ async def process_envelope(topic, env):
                         firmware=map_report.firmware_version,
                         last_lat=map_report.latitude_i,
                         last_long=map_report.longitude_i,
-                        last_update=datetime.datetime.now(),
+                        last_update=datetime.datetime.now(datetime.UTC),
                     )
                     session.add(node)
             except Exception as e:
@@ -89,7 +89,7 @@ async def process_envelope(topic, env):
                         from_node_id=getattr(env.packet, "from"),
                         to_node_id=env.packet.to,
                         payload=env.packet.SerializeToString(),
-                        import_time=datetime.datetime.now(),
+                        import_time=datetime.datetime.now(datetime.UTC),
                         channel=env.channel_id,
                     )
                     await session.execute(stmt)
@@ -129,7 +129,7 @@ async def process_envelope(topic, env):
                         hop_limit=env.packet.hop_limit,
                         hop_start=env.packet.hop_start,
                         topic=topic,
-                        import_time=datetime.datetime.now(),
+                        import_time=datetime.datetime.now(datetime.UTC),
                     )
                     session.add(seen)
                     await session.flush()
@@ -171,7 +171,7 @@ async def process_envelope(topic, env):
                         node.hw_model = hw_model
                         node.role = role
                         node.channel = env.channel_id
-                        node.last_update = datetime.datetime.now()
+                        node.last_update = datetime.datetime.now(datetime.UTC)
                     else:
                         node = Node(
                             id=user.id,
@@ -181,7 +181,7 @@ async def process_envelope(topic, env):
                             hw_model=hw_model,
                             role=role,
                             channel=env.channel_id,
-                            last_update=datetime.datetime.now(),
+                            last_update=datetime.datetime.now(datetime.UTC),
                         )
                         session.add(node)
             except Exception as e:
@@ -195,7 +195,7 @@ async def process_envelope(topic, env):
                 )
                 if position and position.latitude_i and position.longitude_i:
                     from_node_id = getattr(env.packet, "from")
-                    import_time = datetime.datetime.now()
+                    import_time = datetime.datetime.now(datetime.UTC)
 
                     # Update Node table with last known position (backward compatibility)
                     node = (
@@ -260,7 +260,7 @@ async def process_envelope(topic, env):
                         route=env.packet.decoded.payload,
                         done=not env.packet.decoded.want_response,
                         gateway_node_id=int(env.gateway_id[1:], 16),
-                        import_time=datetime.datetime.now(),
+                        import_time=datetime.datetime.now(datetime.UTC),
                     )
                 )
 
@@ -272,7 +272,7 @@ async def process_envelope(topic, env):
                 )
                 if telemetry:
                     from_node_id = getattr(env.packet, "from")
-                    import_time = datetime.datetime.now()
+                    import_time = datetime.datetime.now(datetime.UTC)
 
                     # Check which metric type is present
                     if telemetry.HasField('device_metrics'):

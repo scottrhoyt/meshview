@@ -47,7 +47,7 @@ async def daily_cleanup_at(
     hour: int = 2, minute: int = 0, days_to_keep: int = 14, vacuum_db: bool = True
 ):
     while True:
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.UTC)
         next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if next_run <= now:
             next_run += datetime.timedelta(days=1)
@@ -56,7 +56,7 @@ async def daily_cleanup_at(
         await asyncio.sleep(delay)
 
         # Calculate cutoff datetime for database cleanup
-        cutoff = datetime.datetime.now() - datetime.timedelta(days=days_to_keep)
+        cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days_to_keep)
         cleanup_logger.info(f"Running cleanup for records older than {cutoff}...")
 
         try:

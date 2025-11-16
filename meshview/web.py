@@ -606,7 +606,7 @@ async def graph_neighbors_json(request):
     import datetime
 
     node_id = int(request.match_info['node_id'])
-    oldest = datetime.datetime.now() - datetime.timedelta(days=4)
+    oldest = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=4)
 
     data = {}
     dates = []
@@ -1081,7 +1081,7 @@ async def nodelist(request):
 async def net(request):
     try:
         # Fetch packets for the given node ID and port number
-        after_time = datetime.datetime.now() - timedelta(days=6)
+        after_time = datetime.datetime.now(datetime.UTC) - timedelta(days=6)
         packets = await store.get_packets(portnum=PortNum.TEXT_MESSAGE_APP, after=after_time)
 
         # Convert packets to UI packets
@@ -1578,7 +1578,7 @@ async def api_stats(request):
 
 @routes.get("/api/edges")
 async def api_edges(request):
-    since = datetime.datetime.now() - datetime.timedelta(hours=48)
+    since = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=48)
     filter_type = request.query.get("type")
 
     edges = {}
