@@ -89,6 +89,22 @@ async def daily_cleanup_at(
                     cleanup_logger.info(f"Deleted {result.rowcount} rows from Traceroute")
 
                     # -------------------------
+                    # DeviceMetrics
+                    # -------------------------
+                    result = await session.execute(
+                        delete(models.DeviceMetrics).where(models.DeviceMetrics.import_time < cutoff)
+                    )
+                    cleanup_logger.info(f"Deleted {result.rowcount} rows from DeviceMetrics")
+
+                    # -------------------------
+                    # EnvironmentMetrics
+                    # -------------------------
+                    result = await session.execute(
+                        delete(models.EnvironmentMetrics).where(models.EnvironmentMetrics.import_time < cutoff)
+                    )
+                    cleanup_logger.info(f"Deleted {result.rowcount} rows from EnvironmentMetrics")
+
+                    # -------------------------
                     # Node
                     # -------------------------
                     result = await session.execute(

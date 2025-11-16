@@ -8,7 +8,7 @@ from meshtastic.protobuf.config_pb2 import Config
 from meshtastic.protobuf.mesh_pb2 import HardwareModel
 from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshview import decode_payload, mqtt_database
-from meshview.models import Node, Packet, PacketSeen, Traceroute
+from meshview.models import DeviceMetrics, EnvironmentMetrics, Node, Packet, PacketSeen, Traceroute
 
 
 async def process_envelope(topic, env):
@@ -212,6 +212,73 @@ async def process_envelope(topic, env):
                         import_time=datetime.datetime.now(),
                     )
                 )
+
+        # --- TELEMETRY_APP (decode and store in dedicated tables)
+        if env.packet.decoded.portnum == PortNum.TELEMETRY_APP:
+            try:
+                telemetry = decode_payload.decode_payload(
+                    PortNum.TELEMETRY_APP, env.packet.decoded.payload
+                )
+                if telemetry:
+                    from_node_id = getattr(env.packet, "from")
+                    import_time = datetime.datetime.now()
+
+                    # Check which metric type is present
+                    if telemetry.HasField('device_metrics'):
+                        # Check if DeviceMetrics already exists for this packet
+                        result = await session.execute(
+                            select(DeviceMetrics).where(DeviceMetrics.packet_id == env.packet.id)
+                        )
+                        if not result.scalar_one_or_none():
+                            device = telemetry.device_metrics
+                            session.add(
+                                DeviceMetrics(
+                                    packet_id=env.packet.id,
+                                    node_id=from_node_id,
+                                    time=telemetry.time if telemetry.time else None,
+                                    import_time=import_time,
+                                    battery_level=device.battery_level if device.battery_level else None,
+                                    voltage=device.voltage if device.voltage else None,
+                                    channel_utilization=device.channel_utilization if device.channel_utilization else None,
+                                    air_util_tx=device.air_util_tx if device.air_util_tx else None,
+                                    uptime_seconds=device.uptime_seconds if device.uptime_seconds else None,
+                                )
+                            )
+
+                    if telemetry.HasField('environment_metrics'):
+                        # Check if EnvironmentMetrics already exists for this packet
+                        result = await session.execute(
+                            select(EnvironmentMetrics).where(EnvironmentMetrics.packet_id == env.packet.id)
+                        )
+                        if not result.scalar_one_or_none():
+                            env_metrics = telemetry.environment_metrics
+                            session.add(
+                                EnvironmentMetrics(
+                                    packet_id=env.packet.id,
+                                    node_id=from_node_id,
+                                    time=telemetry.time if telemetry.time else None,
+                                    import_time=import_time,
+                                    temperature=env_metrics.temperature if env_metrics.temperature else None,
+                                    relative_humidity=env_metrics.relative_humidity if env_metrics.relative_humidity else None,
+                                    barometric_pressure=env_metrics.barometric_pressure if env_metrics.barometric_pressure else None,
+                                    gas_resistance=env_metrics.gas_resistance if env_metrics.gas_resistance else None,
+                                    voltage=env_metrics.voltage if env_metrics.voltage else None,
+                                    current=env_metrics.current if env_metrics.current else None,
+                                    iaq=env_metrics.iaq if env_metrics.iaq else None,
+                                    distance=env_metrics.distance if env_metrics.distance else None,
+                                    lux=env_metrics.lux if env_metrics.lux else None,
+                                    white_lux=env_metrics.white_lux if env_metrics.white_lux else None,
+                                    ir_lux=env_metrics.ir_lux if env_metrics.ir_lux else None,
+                                    uv_lux=env_metrics.uv_lux if env_metrics.uv_lux else None,
+                                    wind_direction=env_metrics.wind_direction if env_metrics.wind_direction else None,
+                                    wind_speed=env_metrics.wind_speed if env_metrics.wind_speed else None,
+                                    wind_gust=env_metrics.wind_gust if env_metrics.wind_gust else None,
+                                    wind_lull=env_metrics.wind_lull if env_metrics.wind_lull else None,
+                                    weight=env_metrics.weight if env_metrics.weight else None,
+                                )
+                            )
+            except Exception as e:
+                print(f"Error processing TELEMETRY_APP: {e}")
 
         await session.commit()
 

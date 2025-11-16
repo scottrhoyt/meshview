@@ -100,3 +100,57 @@ class Traceroute(Base):
     import_time: Mapped[datetime] = mapped_column(nullable=True)
 
     __table_args__ = (Index("idx_traceroute_import_time", "import_time"),)
+
+
+class DeviceMetrics(Base):
+    __tablename__ = "device_metrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    packet_id: Mapped[int] = mapped_column(ForeignKey("packet.id"), nullable=False)
+    node_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    time: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    import_time: Mapped[datetime] = mapped_column(nullable=False)
+    battery_level: Mapped[int] = mapped_column(nullable=True)
+    voltage: Mapped[float] = mapped_column(nullable=True)
+    channel_utilization: Mapped[float] = mapped_column(nullable=True)
+    air_util_tx: Mapped[float] = mapped_column(nullable=True)
+    uptime_seconds: Mapped[int] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        Index("idx_device_metrics_node_id", "node_id"),
+        Index("idx_device_metrics_import_time", desc("import_time")),
+        Index("idx_device_metrics_node_time", "node_id", desc("import_time")),
+    )
+
+
+class EnvironmentMetrics(Base):
+    __tablename__ = "environment_metrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    packet_id: Mapped[int] = mapped_column(ForeignKey("packet.id"), nullable=False)
+    node_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    time: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    import_time: Mapped[datetime] = mapped_column(nullable=False)
+    temperature: Mapped[float] = mapped_column(nullable=True)
+    relative_humidity: Mapped[float] = mapped_column(nullable=True)
+    barometric_pressure: Mapped[float] = mapped_column(nullable=True)
+    gas_resistance: Mapped[float] = mapped_column(nullable=True)
+    voltage: Mapped[float] = mapped_column(nullable=True)
+    current: Mapped[float] = mapped_column(nullable=True)
+    iaq: Mapped[int] = mapped_column(nullable=True)
+    distance: Mapped[float] = mapped_column(nullable=True)
+    lux: Mapped[float] = mapped_column(nullable=True)
+    white_lux: Mapped[float] = mapped_column(nullable=True)
+    ir_lux: Mapped[float] = mapped_column(nullable=True)
+    uv_lux: Mapped[float] = mapped_column(nullable=True)
+    wind_direction: Mapped[int] = mapped_column(nullable=True)
+    wind_speed: Mapped[float] = mapped_column(nullable=True)
+    wind_gust: Mapped[float] = mapped_column(nullable=True)
+    wind_lull: Mapped[float] = mapped_column(nullable=True)
+    weight: Mapped[float] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        Index("idx_environment_metrics_node_id", "node_id"),
+        Index("idx_environment_metrics_import_time", desc("import_time")),
+        Index("idx_environment_metrics_node_time", "node_id", desc("import_time")),
+    )
