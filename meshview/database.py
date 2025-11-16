@@ -9,9 +9,13 @@ async_session = None
 def init_database(database_connection_string):
     global engine, async_session
     kwargs = {"echo": False}
-    # Ensure SQLite is opened in read-only mode
-    database_connection_string += "?mode=ro"
-    kwargs["connect_args"] = {"uri": True}
+
+    # SQLite-specific configuration
+    if database_connection_string.startswith("sqlite"):
+        # Ensure SQLite is opened in read-only mode
+        database_connection_string += "?mode=ro"
+        kwargs["connect_args"] = {"uri": True}
+
     engine = create_async_engine(database_connection_string, **kwargs)
     async_session = async_sessionmaker(
         bind=engine,

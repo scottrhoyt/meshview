@@ -1,8 +1,8 @@
 import datetime
 import re
 
-from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy import insert, select
+from sqlalchemy.exc import IntegrityError
 
 from meshtastic.protobuf.config_pb2 import Config
 from meshtastic.protobuf.mesh_pb2 import HardwareModel
@@ -72,7 +72,7 @@ async def process_envelope(topic, env):
         return
 
     async with mqtt_database.async_session() as session:
-        # --- Packet insert with ON CONFLICT DO NOTHING
+        # --- Packet insert (skip if already exists)
         result = await session.execute(select(Packet).where(Packet.id == env.packet.id))
         # FIXME: Not Used
         # new_packet = False
@@ -80,9 +80,8 @@ async def process_envelope(topic, env):
         if not packet:
             # FIXME: Not Used
             # new_packet = True
-            stmt = (
-                sqlite_insert(Packet)
-                .values(
+            try:
+                stmt = insert(Packet).values(
                     id=env.packet.id,
                     portnum=env.packet.decoded.portnum,
                     from_node_id=getattr(env.packet, "from"),
@@ -91,9 +90,10 @@ async def process_envelope(topic, env):
                     import_time=datetime.datetime.now(),
                     channel=env.channel_id,
                 )
-                .on_conflict_do_nothing(index_elements=["id"])
-            )
-            await session.execute(stmt)
+                await session.execute(stmt)
+            except IntegrityError:
+                # Packet was inserted by another process, ignore
+                pass
 
         # --- PacketSeen (no conflict handling here, normal insert)
 

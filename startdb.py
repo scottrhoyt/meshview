@@ -3,7 +3,7 @@ import datetime
 import json
 import logging
 
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 
 from meshview import models, mqtt_database, mqtt_reader, mqtt_store
 from meshview.config import CONFIG
@@ -55,10 +55,8 @@ async def daily_cleanup_at(
         cleanup_logger.info(f"Next cleanup scheduled at {next_run}")
         await asyncio.sleep(delay)
 
-        # Local-time cutoff as string for SQLite DATETIME comparison
-        cutoff = (datetime.datetime.now() - datetime.timedelta(days=days_to_keep)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        # Calculate cutoff datetime for database cleanup
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=days_to_keep)
         cleanup_logger.info(f"Running cleanup for records older than {cutoff}...")
 
         try:
@@ -102,8 +100,18 @@ async def daily_cleanup_at(
 
                 if vacuum_db:
                     cleanup_logger.info("Running VACUUM...")
-                    async with mqtt_database.engine.begin() as conn:
-                        await conn.exec_driver_sql("VACUUM;")
+                    # VACUUM must be run outside of a transaction in PostgreSQL
+                    if mqtt_database.engine.dialect.name == 'postgresql':
+                        # PostgreSQL requires autocommit mode for VACUUM
+                        # Use raw connection to execute VACUUM outside of transaction
+                        async with mqtt_database.engine.connect() as conn:
+                            # Get the underlying asyncpg connection
+                            raw_conn = await conn.get_raw_connection()
+                            await raw_conn.driver_connection.execute("VACUUM ANALYZE")
+                    else:
+                        # SQLite: VACUUM within a connection
+                        async with mqtt_database.engine.begin() as conn:
+                            await conn.exec_driver_sql("VACUUM")
                     cleanup_logger.info("VACUUM completed.")
 
                 cleanup_logger.info("Cleanup completed successfully.")

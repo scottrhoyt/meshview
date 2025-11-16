@@ -25,6 +25,16 @@ async def get_fuzzy_nodes(query):
 
 
 async def get_packets(node_id=None, portnum=None, after=None, before=None, limit=None):
+    """
+    Get packets with optional filters.
+
+    Args:
+        node_id: Filter by from/to node ID
+        portnum: Filter by port number
+        after: Filter packets after this time (can be timedelta or datetime)
+        before: Filter packets before this time (can be timedelta or datetime)
+        limit: Maximum number of packets to return
+    """
     async with database.async_session() as session:
         q = select(Packet)
 
@@ -33,9 +43,19 @@ async def get_packets(node_id=None, portnum=None, after=None, before=None, limit
         if portnum:
             q = q.where(Packet.portnum == portnum)
         if after:
-            q = q.where(Packet.import_time > after)
+            # Support both timedelta and datetime for backwards compatibility
+            if isinstance(after, timedelta):
+                after_time = datetime.now() - after
+            else:
+                after_time = after
+            q = q.where(Packet.import_time > after_time)
         if before:
-            q = q.where(Packet.import_time < before)
+            # Support both timedelta and datetime for backwards compatibility
+            if isinstance(before, timedelta):
+                before_time = datetime.now() - before
+            else:
+                before_time = before
+            q = q.where(Packet.import_time < before_time)
 
         q = q.order_by(Packet.import_time.desc())
 
@@ -115,11 +135,23 @@ async def get_traceroute(packet_id):
 
 
 async def get_traceroutes(since):
+    """
+    Get traceroutes since a given time period.
+
+    Args:
+        since: Can be either a timedelta (relative time) or datetime (absolute time)
+    """
     async with database.async_session() as session:
+        # Support both timedelta and datetime for backwards compatibility
+        if isinstance(since, timedelta):
+            cutoff_time = datetime.now() - since
+        else:
+            cutoff_time = since
+
         stmt = (
             select(Traceroute)
             .join(Packet)
-            .where(Traceroute.import_time > since)
+            .where(Traceroute.import_time > cutoff_time)
             .order_by(Traceroute.import_time)
         )
         stream = await session.stream_scalars(stmt)
@@ -181,10 +213,13 @@ async def get_total_node_count(channel: str = None) -> int:
 
 async def get_top_traffic_nodes():
     try:
+        # Calculate 24 hours ago in Python for database-agnostic query
+        cutoff_time = datetime.now() - timedelta(hours=24)
+
         async with database.async_session() as session:
             result = await session.execute(
                 text("""
-                SELECT 
+                SELECT
                     n.node_id,
                     n.long_name,
                     n.short_name,
@@ -193,12 +228,13 @@ async def get_top_traffic_nodes():
                     COUNT(ps.packet_id) AS total_times_seen
                 FROM node n
                 LEFT JOIN packet p ON n.node_id = p.from_node_id
-                    AND p.import_time >= DATETIME('now', 'localtime', '-24 hours')
+                    AND p.import_time >= :cutoff_time
                 LEFT JOIN packet_seen ps ON p.id = ps.packet_id
                 GROUP BY n.node_id, n.long_name, n.short_name
                 HAVING total_packets_sent > 0
                 ORDER BY total_times_seen DESC;
-            """)
+            """),
+                {"cutoff_time": cutoff_time}
             )
 
             rows = result.fetchall()
@@ -223,20 +259,23 @@ async def get_top_traffic_nodes():
 
 async def get_node_traffic(node_id: int):
     try:
+        # Calculate 24 hours ago in Python for database-agnostic query
+        cutoff_time = datetime.now() - timedelta(hours=24)
+
         async with database.async_session() as session:
             result = await session.execute(
                 text("""
-                    SELECT 
-                        node.long_name, packet.portnum, 
+                    SELECT
+                        node.long_name, packet.portnum,
                         COUNT(*) AS packet_count
                     FROM packet
                     JOIN node ON packet.from_node_id = node.node_id
-                    WHERE node.node_id = :node_id 
-                    AND packet.import_time >= DATETIME('now', 'localtime', '-24 hours') 
+                    WHERE node.node_id = :node_id
+                    AND packet.import_time >= :cutoff_time
                     GROUP BY packet.portnum
                     ORDER BY packet_count DESC;
                 """),
-                {"node_id": node_id},
+                {"node_id": node_id, "cutoff_time": cutoff_time},
             )
 
             # Map the result to include node.long_name and packet data
@@ -287,8 +326,8 @@ async def get_nodes(role=None, channel=None, hw_model=None, days_active=None):
             if days_active is not None:
                 query = query.where(Node.last_update > datetime.now() - timedelta(days_active))
 
-            # Exclude nodes where last_update is an empty string
-            query = query.where(Node.last_update != "")
+            # Exclude nodes where last_update is NULL
+            query = query.where(Node.last_update.is_not(None))
 
             # Order results by long_name in ascending order
             query = query.order_by(Node.short_name.asc())
@@ -316,15 +355,27 @@ async def get_packet_stats(
     if period_type == "hour":
         start_time = now - timedelta(hours=length)
         time_format = '%Y-%m-%d %H:00'
+        pg_format = 'YYYY-MM-DD HH24:00'
     elif period_type == "day":
         start_time = now - timedelta(days=length)
         time_format = '%Y-%m-%d'
+        pg_format = 'YYYY-MM-DD'
     else:
         raise ValueError("period_type must be 'hour' or 'day'")
 
     async with database.async_session() as session:
+        # Detect database dialect to use appropriate date formatting
+        dialect_name = database.engine.dialect.name
+
+        if dialect_name == 'postgresql':
+            # PostgreSQL uses to_char()
+            period_expr = func.to_char(Packet.import_time, pg_format).label('period')
+        else:
+            # SQLite and others use strftime()
+            period_expr = func.strftime(time_format, Packet.import_time).label('period')
+
         q = select(
-            func.strftime(time_format, Packet.import_time).label('period'),
+            period_expr,
             func.count().label('count'),
         ).where(Packet.import_time >= start_time)
 

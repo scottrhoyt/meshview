@@ -91,18 +91,35 @@ Install `graphviz` on MacOS or Debian/Ubuntu Linux:
 sudo apt-get install graphviz
 ```
 
+**Optional: Set up PostgreSQL database (recommended for production):**
+
+```bash
+# Install PostgreSQL
+sudo apt-get install postgresql postgresql-contrib
+
+# Create database and user
+sudo -u postgres createdb meshview
+sudo -u postgres createuser meshview_user -P
+
+# Grant privileges
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE meshview TO meshview_user;"
+```
+
 Copy `sample.config.ini` to `config.ini`:
 
 ```bash
 cp sample.config.ini config.ini
 ```
 
-Edit `config.ini` to match your MQTT and web server settings:
-
+Edit `config.ini` to match your MQTT and database settings:
 
 ```bash
 nano config.ini
 ```
+
+> **NOTE: Database Configuration**
+> - For **production**: Use PostgreSQL: `connection_string = postgresql+asyncpg://meshview_user:password@localhost/meshview`
+> - For **development/testing**: Use SQLite: `connection_string = sqlite+aiosqlite:///packets.db`
 
 > **NOTE**
 > On MacOS set the bind configuration line to 
@@ -194,8 +211,13 @@ password = large4cats
 # Database Configuration
 # -------------------------
 [database]
-# SQLAlchemy connection string. This one uses SQLite with asyncio support.
-connection_string = sqlite+aiosqlite:///packets.db
+# SQLAlchemy connection string.
+#
+# PostgreSQL (recommended for production):
+connection_string = postgresql+asyncpg://username:password@localhost/meshview
+#
+# SQLite (for development/testing):
+# connection_string = sqlite+aiosqlite:///packets.db
 
 
 # -------------------------
