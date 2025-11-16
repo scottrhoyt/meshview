@@ -105,6 +105,14 @@ async def daily_cleanup_at(
                     cleanup_logger.info(f"Deleted {result.rowcount} rows from EnvironmentMetrics")
 
                     # -------------------------
+                    # Position
+                    # -------------------------
+                    result = await session.execute(
+                        delete(models.Position).where(models.Position.import_time < cutoff)
+                    )
+                    cleanup_logger.info(f"Deleted {result.rowcount} rows from Position")
+
+                    # -------------------------
                     # Node
                     # -------------------------
                     result = await session.execute(

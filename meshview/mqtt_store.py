@@ -8,7 +8,7 @@ from meshtastic.protobuf.config_pb2 import Config
 from meshtastic.protobuf.mesh_pb2 import HardwareModel
 from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshview import decode_payload, mqtt_database
-from meshview.models import DeviceMetrics, EnvironmentMetrics, Node, Packet, PacketSeen, Traceroute
+from meshview.models import DeviceMetrics, EnvironmentMetrics, Node, Packet, PacketSeen, Position, Traceroute
 
 
 async def process_envelope(topic, env):
@@ -80,20 +80,23 @@ async def process_envelope(topic, env):
         if not packet:
             # FIXME: Not Used
             # new_packet = True
-            try:
-                stmt = insert(Packet).values(
-                    id=env.packet.id,
-                    portnum=env.packet.decoded.portnum,
-                    from_node_id=getattr(env.packet, "from"),
-                    to_node_id=env.packet.to,
-                    payload=env.packet.SerializeToString(),
-                    import_time=datetime.datetime.now(),
-                    channel=env.channel_id,
-                )
-                await session.execute(stmt)
-            except IntegrityError:
-                # Packet was inserted by another process, ignore
-                pass
+            # Use a nested transaction (savepoint) for PostgreSQL compatibility
+            async with session.begin_nested():
+                try:
+                    stmt = insert(Packet).values(
+                        id=env.packet.id,
+                        portnum=env.packet.decoded.portnum,
+                        from_node_id=getattr(env.packet, "from"),
+                        to_node_id=env.packet.to,
+                        payload=env.packet.SerializeToString(),
+                        import_time=datetime.datetime.now(),
+                        channel=env.channel_id,
+                    )
+                    await session.execute(stmt)
+                    await session.flush()
+                except IntegrityError:
+                    # Packet was inserted by another process, ignore
+                    pass
 
         # --- PacketSeen (no conflict handling here, normal insert)
 
@@ -112,19 +115,27 @@ async def process_envelope(topic, env):
             )
         )
         if not result.scalar_one_or_none():
-            seen = PacketSeen(
-                packet_id=env.packet.id,
-                node_id=int(env.gateway_id[1:], 16),
-                channel=env.channel_id,
-                rx_time=env.packet.rx_time,
-                rx_snr=env.packet.rx_snr,
-                rx_rssi=env.packet.rx_rssi,
-                hop_limit=env.packet.hop_limit,
-                hop_start=env.packet.hop_start,
-                topic=topic,
-                import_time=datetime.datetime.now(),
-            )
-            session.add(seen)
+            # Use a nested transaction (savepoint) so if PacketSeen insert fails,
+            # we can rollback just this operation without affecting Packet insert
+            async with session.begin_nested():
+                try:
+                    seen = PacketSeen(
+                        packet_id=env.packet.id,
+                        node_id=int(env.gateway_id[1:], 16),
+                        channel=env.channel_id,
+                        rx_time=env.packet.rx_time,
+                        rx_snr=env.packet.rx_snr,
+                        rx_rssi=env.packet.rx_rssi,
+                        hop_limit=env.packet.hop_limit,
+                        hop_start=env.packet.hop_start,
+                        topic=topic,
+                        import_time=datetime.datetime.now(),
+                    )
+                    session.add(seen)
+                    await session.flush()
+                except IntegrityError:
+                    # PacketSeen duplicate - already exists, ignore
+                    pass
 
         # --- NODEINFO_APP handling
         if env.packet.decoded.portnum == PortNum.NODEINFO_APP:
@@ -178,18 +189,58 @@ async def process_envelope(topic, env):
 
         # --- POSITION_APP handling
         if env.packet.decoded.portnum == PortNum.POSITION_APP:
-            position = decode_payload.decode_payload(
-                PortNum.POSITION_APP, env.packet.decoded.payload
-            )
-            if position and position.latitude_i and position.longitude_i:
-                from_node_id = getattr(env.packet, "from")
-                node = (
-                    await session.execute(select(Node).where(Node.node_id == from_node_id))
-                ).scalar_one_or_none()
-                if node:
-                    node.last_lat = position.latitude_i
-                    node.last_long = position.longitude_i
-                    session.add(node)
+            try:
+                position = decode_payload.decode_payload(
+                    PortNum.POSITION_APP, env.packet.decoded.payload
+                )
+                if position and position.latitude_i and position.longitude_i:
+                    from_node_id = getattr(env.packet, "from")
+                    import_time = datetime.datetime.now()
+
+                    # Update Node table with last known position (backward compatibility)
+                    node = (
+                        await session.execute(select(Node).where(Node.node_id == from_node_id))
+                    ).scalar_one_or_none()
+                    if node:
+                        node.last_lat = position.latitude_i
+                        node.last_long = position.longitude_i
+                        session.add(node)
+
+                    # Store full position history in Position table (with deduplication)
+                    result = await session.execute(
+                        select(Position).where(Position.packet_id == env.packet.id)
+                    )
+                    if not result.scalar_one_or_none():
+                        session.add(
+                            Position(
+                                packet_id=env.packet.id,
+                                node_id=from_node_id,
+                                latitude_i=position.latitude_i,
+                                longitude_i=position.longitude_i,
+                                altitude=position.altitude if position.altitude else None,
+                                altitude_hae=position.altitude_hae if position.altitude_hae else None,
+                                altitude_geoidal_separation=position.altitude_geoidal_separation if position.altitude_geoidal_separation else None,
+                                timestamp=position.timestamp if position.timestamp else None,
+                                timestamp_millis_adjust=position.timestamp_millis_adjust if position.timestamp_millis_adjust else None,
+                                import_time=import_time,
+                                PDOP=position.PDOP if position.PDOP else None,
+                                HDOP=position.HDOP if position.HDOP else None,
+                                VDOP=position.VDOP if position.VDOP else None,
+                                gps_accuracy=position.gps_accuracy if position.gps_accuracy else None,
+                                fix_quality=position.fix_quality if position.fix_quality else None,
+                                fix_type=position.fix_type if position.fix_type else None,
+                                sats_in_view=position.sats_in_view if position.sats_in_view else None,
+                                ground_speed=position.ground_speed if position.ground_speed else None,
+                                ground_track=position.ground_track if position.ground_track else None,
+                                location_source=position.location_source if position.location_source else None,
+                                altitude_source=position.altitude_source if position.altitude_source else None,
+                                sensor_id=position.sensor_id if position.sensor_id else None,
+                                seq_number=position.seq_number if position.seq_number else None,
+                                precision_bits=position.precision_bits if position.precision_bits else None,
+                            )
+                        )
+            except Exception as e:
+                print(f"Error processing POSITION_APP: {e}")
 
         # --- TRACEROUTE_APP (no conflict handling, normal insert)
         if env.packet.decoded.portnum == PortNum.TRACEROUTE_APP:

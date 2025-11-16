@@ -154,3 +154,54 @@ class EnvironmentMetrics(Base):
         Index("idx_environment_metrics_import_time", desc("import_time")),
         Index("idx_environment_metrics_node_time", "node_id", desc("import_time")),
     )
+
+
+class Position(Base):
+    __tablename__ = "position"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    packet_id: Mapped[int] = mapped_column(ForeignKey("packet.id"), nullable=False)
+    node_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    # Core coordinates (required)
+    latitude_i: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    longitude_i: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    # Altitude fields
+    altitude: Mapped[int] = mapped_column(nullable=True)
+    altitude_hae: Mapped[int] = mapped_column(nullable=True)
+    altitude_geoidal_separation: Mapped[int] = mapped_column(nullable=True)
+
+    # Timing
+    timestamp: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    timestamp_millis_adjust: Mapped[int] = mapped_column(nullable=True)
+    import_time: Mapped[datetime] = mapped_column(nullable=False)
+
+    # GPS Quality/Accuracy metrics
+    PDOP: Mapped[int] = mapped_column(nullable=True)
+    HDOP: Mapped[int] = mapped_column(nullable=True)
+    VDOP: Mapped[int] = mapped_column(nullable=True)
+    gps_accuracy: Mapped[int] = mapped_column(nullable=True)
+    fix_quality: Mapped[int] = mapped_column(nullable=True)
+    fix_type: Mapped[int] = mapped_column(nullable=True)
+    sats_in_view: Mapped[int] = mapped_column(nullable=True)
+
+    # Movement data
+    ground_speed: Mapped[int] = mapped_column(nullable=True)
+    ground_track: Mapped[int] = mapped_column(nullable=True)
+
+    # Source information
+    location_source: Mapped[int] = mapped_column(nullable=True)
+    altitude_source: Mapped[int] = mapped_column(nullable=True)
+
+    # Additional metadata
+    sensor_id: Mapped[int] = mapped_column(nullable=True)
+    seq_number: Mapped[int] = mapped_column(nullable=True)
+    precision_bits: Mapped[int] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        Index("idx_position_node_id", "node_id"),
+        Index("idx_position_import_time", desc("import_time")),
+        Index("idx_position_node_time", "node_id", desc("import_time")),
+        Index("idx_position_packet_id", "packet_id"),
+    )
