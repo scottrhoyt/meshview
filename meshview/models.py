@@ -115,6 +115,7 @@ class DeviceMetrics(Base):
     channel_utilization: Mapped[float] = mapped_column(nullable=True)
     air_util_tx: Mapped[float] = mapped_column(nullable=True)
     uptime_seconds: Mapped[int] = mapped_column(nullable=True)
+    channel: Mapped[str] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index("idx_device_metrics_node_id", "node_id"),

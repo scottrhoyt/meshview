@@ -293,6 +293,7 @@ async def process_envelope(topic, env):
                                     channel_utilization=device.channel_utilization if device.channel_utilization else None,
                                     air_util_tx=device.air_util_tx if device.air_util_tx else None,
                                     uptime_seconds=device.uptime_seconds if device.uptime_seconds else None,
+                                    channel=env.channel_id,
                                 )
                             )
 
