@@ -9,3 +9,8 @@ meshview-web.pid
 config.ini
 screenshots/*
 python/nanopb
+
+
+CLAUDE.md
+venv
+dbcleanup.log
