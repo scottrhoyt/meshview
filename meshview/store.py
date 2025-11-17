@@ -230,8 +230,8 @@ async def get_top_traffic_nodes():
                 LEFT JOIN packet p ON n.node_id = p.from_node_id
                     AND p.import_time >= :cutoff_time
                 LEFT JOIN packet_seen ps ON p.id = ps.packet_id
-                GROUP BY n.node_id, n.long_name, n.short_name
-                HAVING total_packets_sent > 0
+                GROUP BY n.node_id, n.long_name, n.short_name, n.channel
+                HAVING COUNT(DISTINCT p.id) > 0
                 ORDER BY total_times_seen DESC;
             """),
                 {"cutoff_time": cutoff_time}
@@ -272,7 +272,7 @@ async def get_node_traffic(node_id: int):
                     JOIN node ON packet.from_node_id = node.node_id
                     WHERE node.node_id = :node_id
                     AND packet.import_time >= :cutoff_time
-                    GROUP BY packet.portnum
+                    GROUP BY node.long_name, packet.portnum
                     ORDER BY packet_count DESC;
                 """),
                 {"node_id": node_id, "cutoff_time": cutoff_time},
