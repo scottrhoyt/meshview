@@ -274,6 +274,12 @@ async def process_envelope(topic, env):
                     from_node_id = getattr(env.packet, "from")
                     import_time = datetime.datetime.now(datetime.UTC)
 
+                    # Look up node's role for telemetry records
+                    node = (
+                        await session.execute(select(Node).where(Node.node_id == from_node_id))
+                    ).scalar_one_or_none()
+                    node_role = node.role if node else None
+
                     # Check which metric type is present
                     if telemetry.HasField('device_metrics'):
                         # Check if DeviceMetrics already exists for this packet
@@ -294,6 +300,7 @@ async def process_envelope(topic, env):
                                     air_util_tx=device.air_util_tx if device.air_util_tx else None,
                                     uptime_seconds=device.uptime_seconds if device.uptime_seconds else None,
                                     channel=env.channel_id,
+                                    role=node_role,
                                 )
                             )
 
