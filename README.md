@@ -288,7 +288,11 @@ Open in your browser: http://localhost:8081/
 ## Setting Up Systemd Services (Ubuntu)
 
 To run Meshview automatically on boot, create systemd services for `startdb.py` and `main.py`.
-> **NOTE**  
+
+> **TIP**
+> Ready-to-use service template files are available in the `contrib/systemd/` directory. See [`contrib/systemd/README.md`](contrib/systemd/README.md) for quick installation instructions.
+
+> **NOTE**
 > You need to change the "User" and "/path/to/meshview" for your instance of the code on each service.
 
 ### 1. Service for `startdb.py`

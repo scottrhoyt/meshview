@@ -1,0 +1,14 @@
+[Unit]
+Description=Meshview Database Initializer
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/meshview
+ExecStart=/path/to/meshview/env/bin/python /path/to/meshview/startdb.py --config /path/to/meshview/config.ini
+Restart=always
+RestartSec=5
+User=yourusername
+
+[Install]
+WantedBy=multi-user.target
