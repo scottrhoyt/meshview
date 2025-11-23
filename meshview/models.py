@@ -178,6 +178,7 @@ class Position(Base):
     timestamp: Mapped[int] = mapped_column(BigInteger, nullable=True)
     timestamp_millis_adjust: Mapped[int] = mapped_column(nullable=True)
     import_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    channel: Mapped[str] = mapped_column(nullable=True)
 
     # GPS Quality/Accuracy metrics
     PDOP: Mapped[int] = mapped_column(nullable=True)

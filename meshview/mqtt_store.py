@@ -223,6 +223,7 @@ async def process_envelope(topic, env):
                                 timestamp=position.timestamp if position.timestamp else None,
                                 timestamp_millis_adjust=position.timestamp_millis_adjust if position.timestamp_millis_adjust else None,
                                 import_time=import_time,
+                                channel=env.channel_id,
                                 PDOP=position.PDOP if position.PDOP else None,
                                 HDOP=position.HDOP if position.HDOP else None,
                                 VDOP=position.VDOP if position.VDOP else None,
