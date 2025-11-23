@@ -9,8 +9,27 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from google.protobuf.message import DecodeError
 
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
+from meshview.config import CONFIG
 
-KEY = base64.b64decode("1PG7OiApB1nwvP+rz05pAQ==")
+# Default Meshtastic encryption key
+DEFAULT_KEY = base64.b64decode("1PG7OiApB1nwvP+rz05pAQ==")
+
+# Load channel-specific encryption keys from config
+# Note: ConfigParser lowercases keys, so we store with lowercase for case-insensitive lookup
+CHANNEL_KEYS = {}
+for channel_name, key_b64 in CONFIG.get('channels', {}).items():
+    try:
+        key_bytes = base64.b64decode(key_b64)
+        if len(key_bytes) not in (16, 32):
+            logging.warning(
+                f"Invalid key length for channel '{channel_name}': "
+                f"{len(key_bytes)} bytes (must be 16 or 32)"
+            )
+            continue
+        # Store with lowercase key for case-insensitive matching
+        CHANNEL_KEYS[channel_name.lower()] = key_bytes
+    except Exception as e:
+        logging.warning(f"Failed to load key for channel '{channel_name}': {e}")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,20 +40,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def decrypt(packet):
+def decrypt(packet, channel_id=None):
     if packet.HasField("decoded"):
         return
+
     packet_id = packet.id.to_bytes(8, "little")
     from_node_id = getattr(packet, "from").to_bytes(8, "little")
     nonce = packet_id + from_node_id
 
-    cipher = Cipher(algorithms.AES(KEY), modes.CTR(nonce))
-    decryptor = cipher.decryptor()
-    raw_proto = decryptor.update(packet.encrypted) + decryptor.finalize()
-    try:
-        packet.decoded.ParseFromString(raw_proto)
-    except DecodeError:
-        pass
+    # Build list of keys to try: channel-specific first, then default
+    keys_to_try = []
+    if channel_id:
+        # Case-insensitive lookup since ConfigParser lowercases keys
+        channel_key = CHANNEL_KEYS.get(channel_id.lower())
+        if channel_key:
+            keys_to_try.append(channel_key)
+    keys_to_try.append(DEFAULT_KEY)
+
+    for key in keys_to_try:
+        cipher = Cipher(algorithms.AES(key), modes.CTR(nonce))
+        decryptor = cipher.decryptor()
+        raw_proto = decryptor.update(packet.encrypted) + decryptor.finalize()
+        try:
+            packet.decoded.ParseFromString(raw_proto)
+            if packet.HasField("decoded") and packet.decoded.portnum:
+                return  # Successfully decoded with valid portnum
+        except DecodeError:
+            continue  # Try next key
+
+    # If we get here, none of the keys worked - clear any partial decode
+    packet.decoded.Clear()
 
 
 async def get_topic_envelopes(mqtt_server, mqtt_port, topics, mqtt_user, mqtt_passwd):
@@ -65,7 +100,7 @@ async def get_topic_envelopes(mqtt_server, mqtt_port, topics, mqtt_user, mqtt_pa
                     except DecodeError:
                         continue
 
-                    decrypt(envelope.packet)
+                    decrypt(envelope.packet, envelope.channel_id)
                     # print(envelope.packet.decoded)
                     if not envelope.packet.decoded:
                         continue
