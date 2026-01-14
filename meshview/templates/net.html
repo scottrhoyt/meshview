@@ -38,7 +38,7 @@
           {{packet.import_time.isoformat()}}
       </span>
       <span class="col-1 timestamp">
-          <a href="/packet/{{ packet.id }}" title="View packet details">✉️</a> {{ packet.from_node.channel }}
+          <a href="/packet/{{ packet.id }}" title="View packet details">✉️</a> {{ packet.channel }}
       </span>
       <span class="col-2 username">
           <a href="/packet_list/{{ packet.from_node_id }}" title="View all packets from this node">

@@ -59,6 +59,7 @@ class Packet:
     payload: str
     pretty_payload: Markup
     import_time: datetime.datetime
+    channel: str
 
     @classmethod
     def from_model(cls, packet):
@@ -104,6 +105,7 @@ class Packet:
             import_time=packet.import_time,
             raw_mesh_packet=mesh_packet,
             raw_payload=payload,
+            channel=packet.channel or "",
         )
 
 
@@ -1403,7 +1405,7 @@ async def api_chat(request):
             packet_dict = {
                 "id": p.id,
                 "import_time": p.import_time.isoformat(),
-                "channel": getattr(p.from_node, "channel", ""),
+                "channel": p.channel,
                 "from_node_id": p.from_node_id,
                 "long_name": getattr(p.from_node, "long_name", ""),
                 "payload": p.payload,
